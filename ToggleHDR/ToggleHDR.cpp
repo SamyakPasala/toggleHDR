@@ -11,6 +11,25 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     long status;
     std::string err_msg;
 
+    // Take command line args to set HDR state across capable displays
+
+    bool forceState = false;
+    bool hdrRequired;
+
+    int argNum;
+
+    LPWSTR* argList = CommandLineToArgvW(GetCommandLineW(), &argNum);
+
+    if (argNum == 2) {
+        forceState = true;
+        if (lstrcmpW(argList[1], L"0") != 0 && lstrcmpW(argList[1], L"1") != 0) {
+            err_msg = "Provide HDR state as 0 or 1";
+            OutputDebugStringW((LPCWSTR)err_msg.c_str());
+            forceState = false;
+        }
+        hdrRequired = lstrcmpW(argList[1], L"0");
+    }
+
     status = GetDisplayConfigBufferSizes(QDC_ONLY_ACTIVE_PATHS | QDC_VIRTUAL_MODE_AWARE, &numPathArrayElements, &numModeInfoArrayElements);
 
     if (status != ERROR_SUCCESS) {
@@ -36,7 +55,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     for (uint32_t i = 0; i < numPathArrayElements; ++i) {
         if (pathArray[i].flags & DISPLAYCONFIG_PATH_ACTIVE)
         {
-            
+
             hdrCapability.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_ADVANCED_COLOR_INFO;
             hdrCapability.header.size = sizeof(DISPLAYCONFIG_GET_ADVANCED_COLOR_INFO);
             hdrCapability.header.adapterId = pathArray[i].sourceInfo.adapterId;
@@ -55,7 +74,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 hdrState.header.size = sizeof(DISPLAYCONFIG_SET_ADVANCED_COLOR_STATE);
                 hdrState.header.adapterId = pathArray[i].sourceInfo.adapterId;
                 hdrState.header.id = pathArray[i].targetInfo.id;
-                hdrState.enableAdvancedColor = (hdrCapability.advancedColorEnabled == 0) ? 1 : 0;
+                if (forceState == false) {
+                    hdrState.enableAdvancedColor = (hdrCapability.advancedColorEnabled == 0) ? 1 : 0;
+                }
+                else {
+                    hdrState.enableAdvancedColor = hdrRequired;
+                }
 
                 status = DisplayConfigSetDeviceInfo(&hdrState.header);
 
